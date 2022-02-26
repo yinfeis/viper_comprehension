@@ -21,78 +21,126 @@ field val: Int // field of values of the object
 define access(a)
   (forall j: Int :: 0 <= j && j < len(a) ==> acc(loc(a,j).val))
 
+function inv_e(r:Ref) : Int
 
-/* 
- represents the sum of all elements in the array
- no body/postcondition
- */
-function sum(a: Array) : Int
-    requires access(a)
+domain Filter[A] {
+  // apply f to a
+  function filtering(f:Filter[A], a:Int): Bool
+  // check if f is empty
+  function empty(f:Filter[A]):Bool
 
+  // outputs a filter with all references in f except one reference r
+  //function narrow(f:Filter[A], a:A): Filter[A]
+  function narrow(f:Filter[A], r:Ref): Filter[A]
 
-define incremented(a) sum(a) != old(sum(a))
-// function incremented(a:Array) : Bool
-//     requires access(a)
-//     requires notincremented(a)
+  // outputs a filter with all references in f1 except those in f2
+  function minus(f1:Filter[A],f2:Filter[A]): Filter[A]
 
-/* increments two to the value at position i in array a
- */
+  function constfilterone(a:Array): Filter[Int]
+
+  axiom filterone {
+    forall i:Int, a:Array :: {filtering(constfilterone(a),i)} filtering(constfilterone(a),i) <==> i>= 0 && i< len(a) 
+  }
+
+  axiom emp {
+    forall f:Filter[A] :: {empty(f)} empty(f) <==> (forall a:Int :: {filtering(f,a)} !filtering(f,a))
+  } 
+  
+  // axiom nar {
+  //   forall f:Filter[A], r:Ref, a:A :: {filtering(narrow(f,r),a)} 
+  //   filtering(narrow(f,r),a) <==> filtering(f,a) && e(a) != r
+  // } 
+
+  // axiom nar {
+  //   forall f:Filter[A], r:Ref, a:Int, arr:Array :: {filtering(narrow(f,r),a)} 
+  //   filtering(narrow(f,r),a) <==> filtering(f,a) && loc(arr,a) != r
+  // } 
+
+  axiom min{
+    forall f1:Filter[A], f2:Filter[A], a:Int :: {filtering(minus(f1,f2),a)} 
+    filtering(minus(f1,f2),a) <==> filtering(f1,a) && !filtering(f2,a)
+  }
+}
+
+// the sum of array according to a filter
+function sumRange(a: Array, f: Filter[Int]) : Int
+  requires forall j:Int :: filtering(f,j)  ==> acc(loc(a,j).val)
+  // requires forall i:Int :: filtering(f,i) ==> i >= 0 && i <= len(a)
+
 method incrementtwo(a: Array, i:Int) 
   requires access(a)
   requires 0 <= i && i < len(a)
   ensures  access(a)
-  // ensures  incremented(a)
+  //ensures sumRange(a,constfilterone(a)) == old(sumRange(a,constfilterone(a))) + 2   
 {
-    var value : Int := loc(a,i).val
-    loc(a,i).val := value + 2
+    assert forall j:Int :: filtering(constfilterone(a),j)  ==> 0 <= j && j < len(a)
+    assert forall j:Int :: filtering(constfilterone(a),j)  ==> acc(loc(a,j).val)
+    
+    //assume sumRange(a,constfilterone(a)) == sumRange(a,narrow(constfilterone(a),loc(a,i))) + loc(a,i).val 
+    loc(a,i).val := loc(a,i).val + 2
+    // assume sumRange(a,constfilterone(a)) == sumRange(a,narrow(constfilterone(a),loc(a,i))) + loc(a,i).val 
+
+    //assert forall j:Int :: filtering(constfilterone(a),j)  ==> acc(loc(a,j).val)
 }
 
-/* swap the value at postion m and postion n in array a
- */
-method swap(a: Array, m:Int, n:Int) 
-  requires access(a)
-  requires 0 <= m && m < len(a) && 0 <= n && n < len(a) && m != n
-  ensures  access(a)
-  // ensures  !incremented(a)
-{
-    var value : Int := loc(a,m).val
-    loc(a,m).val := loc(a,n).val
-    loc(a,n).val := value
-}
 
-// /* 
-// reverse the array
+
+// /* swap the value at postion m and postion n in array a
 //  */
+// method swap(a: Array, m:Int, n:Int) 
+//   requires access(a)
+//   requires 0 <= m && m < len(a) && 0 <= n && n < len(a) && m < n
+//   ensures  access(a)
+//   ensures  sumRange(a,0,len(a)) == old(sumRange(a,0,len(a)))
+// {
+//     assume sumRange(a,0,len(a)) == sumRange(a,0,m) + loc(a,m).val + sumRange(a,m+1,n) + loc(a,n).val + sumRange(a,n+1,len(a)) 
+//     var value : Int := loc(a,m).val
+//     loc(a,m).val := loc(a,n).val
+//     loc(a,n).val := value
+//     assume sumRange(a,0,len(a)) == sumRange(a,0,m) + loc(a,m).val + sumRange(a,m+1,n) + loc(a,n).val + sumRange(a,n+1,len(a)) 
+// }
+
+// // /* 
+// // reverse the array
+// //  */
 // method reverse(a: Array) 
 //   requires access(a)
 //   ensures  access(a)
+//   ensures  sumRange(a,0,len(a)) == old(sumRange(a,0,len(a)))
 // {
+    
 //     var start: Int := 0
-//     var end: Int := len(a)
+//     var end: Int := len(a) - 1
+
 //     while (start < end)
 //       invariant access(a)
-//       invariant 0 <= start && start <= end && end <= len(a)
+//       invariant 0 <= start && end < len(a)
+//       invariant sumRange(a,0,len(a)) == old(sumRange(a,0,len(a)))
 //     {
-//       var value : Int := loc(a,start).val
-//       loc(a,start).val := loc(a,end).val
-//       loc(a,end).val := value
+//       assume sumRange(a,0,len(a)) == sumRange(a,0,start) + loc(a,start).val + sumRange(a,start+1,end) + loc(a,end).val + sumRange(a,end+1,len(a)) 
+//       // label l
+//       var value : Int := loc(a,end).val
+//       loc(a,end).val := loc(a,start).val
+//       loc(a,start).val := value
+//       // assert loc(a,start).val == old[l](loc(a,end).val)
+//       assume sumRange(a,0,len(a)) == sumRange(a,0,start) + loc(a,start).val + sumRange(a,start+1,end) + loc(a,end).val + sumRange(a,end+1,len(a)) 
 //       start := start + 1
 //       end := end - 1
 //     }
 // }
 
-     
-method client() {
-  var a: Array
-  // [0,1,2,3,4]
-  inhale len(a) == 5
-  inhale access(a)
-  inhale forall i: Int :: 0 <= i && i < len(a) ==> loc(a, i).val == i
-  var sum1 : Int := sum(a)
-  //assert(sum(a) + 2 == sum(incrementtwo(a,2)))
-  incrementtwo(a,2) // [0,1,4,3,4]
-  var sum2 : Int := sum(a)
-  // assert(sum1 != sum2)
-  assert(incremented(a))
+
+// method client() {
+//   var a: Array
+//   // [0,1,2,3,4]
+//   inhale len(a) == 5
+//   inhale access(a)
+//   inhale forall i: Int :: 0 <= i && i < len(a) ==> loc(a, i).val == i
+//   // var sum1 : Int := sum(a)
+//   // //assert(sum(a) + 2 == sum(incrementtwo(a,2)))
+//   // incrementtwo(a,2) // [0,1,4,3,4]
+//   // var sum2 : Int := sum(a)
+//   // // assert(sum1 != sum2)
+//   // assert(incremented(a))
   
-}
+// }
