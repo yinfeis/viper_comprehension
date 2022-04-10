@@ -25,122 +25,322 @@ function inv_e(r:Ref) : Int
 
 domain Filter[A] {
   // apply f to a
-  function filtering(f:Filter[A], a:Int): Bool
+  function filtering(f:Filter[A], a:A): Bool
   // check if f is empty
   function empty(f:Filter[A]):Bool
 
-  // outputs a filter with all references in f except one reference r
-  //function narrow(f:Filter[A], a:A): Filter[A]
-  function narrow(f:Filter[A], r:Ref): Filter[A]
+  // outputs a filter with all references in f except reference e(b)
+  function narrow(f:Filter[A], b:A): Filter[A]
 
   // outputs a filter with all references in f1 except those in f2
   function minus(f1:Filter[A],f2:Filter[A]): Filter[A]
 
   function constfilterone(a:Array): Filter[Int]
 
+  //function parafilterone(a:Array,i:Int) : Filter[Int]
+
   axiom filterone {
-    forall i:Int, a:Array :: {filtering(constfilterone(a),i)} filtering(constfilterone(a),i) <==> i>= 0 && i< len(a) 
+    forall i:Int, a:Array :: {filtering(constfilterone(a),i)} 
+    filtering(constfilterone(a),i) <==> i>= 0 && i< len(a) 
   }
 
+  // axiom filtertwo {
+  //   forall i:Int,j:Int, a:Array :: {filtering(parafilterone(a,j),i)} 
+  //   filtering(parafilterone(a,j),i) <==> i>= 0 && i< j
+  // }
+
   axiom emp {
-    forall f:Filter[A] :: {empty(f)} empty(f) <==> (forall a:Int :: {filtering(f,a)} !filtering(f,a))
+    forall f:Filter[A] :: {empty(f)} empty(f) <==> (forall a:A :: {filtering(f,a)} !filtering(f,a))
   } 
   
-  // axiom nar {
-  //   forall f:Filter[A], r:Ref, a:A :: {filtering(narrow(f,r),a)} 
-  //   filtering(narrow(f,r),a) <==> filtering(f,a) && e(a) != r
-  // } 
-
-  // axiom nar {
-  //   forall f:Filter[A], r:Ref, a:Int, arr:Array :: {filtering(narrow(f,r),a)} 
-  //   filtering(narrow(f,r),a) <==> filtering(f,a) && loc(arr,a) != r
-  // } 
+  axiom nar {
+    forall f:Filter[A], a:A, b:A :: {filtering(narrow(f,b),a)} 
+    filtering(narrow(f,b),a) <==> filtering(f,a) && !filtering(f,b)
+  } 
 
   axiom min{
-    forall f1:Filter[A], f2:Filter[A], a:Int :: {filtering(minus(f1,f2),a)} 
+    forall f1:Filter[A], f2:Filter[A], a:A :: {filtering(minus(f1,f2),a)} 
     filtering(minus(f1,f2),a) <==> filtering(f1,a) && !filtering(f2,a)
   }
 }
 
+domain Receiver[A] {
+  // apply receiver expression to a, give us the corresponding reference
+  function eval(r:Receiver[A], a:A): Ref
+
+  function inverseval(re:Receiver[A], r:Ref): A
+
+  function constreceiverone(a:Array): Receiver[Int]
+
+  axiom receiverone {
+    forall i:Int, a:Array :: {eval(constreceiverone(a),i)} eval(constreceiverone(a),i) == loc(a,i)
+  }
+
+  // check injectivity
+  // axiom injectivity {
+  //   forall i:Int, j:Int, a:Array :: {filtering(constfilterone(a),j),filtering(constfilterone(a),i)} 
+  //   j!= i && filtering(constfilterone(a),j) && filtering(constfilterone(a),i) ==> eval(constreceiverone(a),i) != eval(constreceiverone(a),j)
+  // }
+
+  // axiom inverse {
+
+  //   forall i:Int, a:Array :: {inverseval(constreceiverone(a),eval(constreceiverone(a),i))} 
+  //   filtering(constfilterone(a),i) ==> inverseval(constreceiverone(a),eval(constreceiverone(a),i)) == i
+  // }
+
+}
+
+domain Operator[B] {
+  function oper(o: Operator[B], b1: B, b2: B) : B 
+
+  function constoperone() : Operator[B]
+
+  // done in comp domain
+  // axiom operone {
+  //   forall i:Int, j:Int :: {oper(constoperone(),i,j)} oper(constoperone(),i,j) == i+ j
+  // }
+}
+
+domain Comp[A,B] {
+  function comp(f:Filter[A], r:Receiver[A], o: Operator[B], u: B) : Comp[A,B]
+
+  function getfilter(c:Comp[A,B]):Filter[A]
+
+  function getreceiver(c:Comp[A,B]):Receiver[A]
+
+  function getoperator(c:Comp[A,B]): Operator[B]
+
+  function getunit(c:Comp[A,B]): B
+
+  function isvalfield(c:Comp[A,B]):Bool
+
+  axiom inverse {
+    forall f:Filter[A], r:Receiver[A],  o: Operator[B], u: B  :: {comp(f,r,o,u)} 
+    getfilter(comp(f,r,o,u)) == f && getreceiver(comp(f,r,o,u)) == r && getoperator(comp(f,r,o,u)) == o && getunit(comp(f,r,o,u)) == u
+  }
+
+  axiom inverse_to_comp {
+    forall c:Comp[A,B] :: {comp(getfilter(c),getreceiver(c),getoperator(c),getunit(c))}
+    comp(getfilter(c),getreceiver(c),getoperator(c),getunit(c)) == c
+  }
+
+  axiom inverse_re {
+    forall i:A, c:Comp[A,B] :: {eval(getreceiver(c),i)} 
+    filtering(getfilter(c),i) ==> inverseval(getreceiver(c),eval(getreceiver(c),i)) == i
+  }
+
+  // find the sum of array 
+  function constcompone(a:Array): Comp[Int,Int]
+
+  axiom componef {
+    forall i: Int, a:Array :: {filtering(getfilter(constcompone(a)),i)} filtering(getfilter(constcompone(a)),i) <==> i>= 0 && i< len(a) 
+  } 
+  axiom componere {
+    forall i: Int, a:Array :: {eval(getreceiver(constcompone(a)),i)} filtering(getfilter(constcompone(a)),i) ==> eval(getreceiver(constcompone(a)),i) == loc(a,i) 
+  }
+
+  axiom componeisVal {
+    forall a:Array :: {constcompone(a)}  isvalfield(constcompone(a))
+  }
+
+  axiom componeoper {
+    forall i: Int, j:Int, a:Array :: {oper(getoperator(constcompone(a)),i,j)} 
+    oper(getoperator(constcompone(a)),i,j) == i+j 
+  } 
+
+  axiom componeunit {
+    forall a:Array :: {constcompone(a)} 
+    getunit(constcompone(a)) == 0
+  } 
+
+  // find the maximum non-negative element in an array
+  function constcomptwo(a:Array): Comp[Int,Int]
+
+  axiom comptwof {
+    forall i: Int, a:Array :: {filtering(getfilter(constcomptwo(a)),i)} filtering(getfilter(constcomptwo(a)),i) <==> i>= 0 && i< len(a) 
+  } 
+  axiom comptwore {
+    forall i: Int, a:Array :: {eval(getreceiver(constcomptwo(a)),i)} filtering(getfilter(constcomptwo(a)),i) ==> eval(getreceiver(constcomptwo(a)),i) == loc(a,i) 
+  }
+
+  axiom comptwoisVal {
+    forall a:Array :: {constcomptwo(a)}  isvalfield(constcomptwo(a))
+  }
+
+  axiom comptwoper {
+    forall i: Int, j:Int, a:Array :: {oper(getoperator(constcomptwo(a)),i,j)} 
+    oper(getoperator(constcomptwo(a)),i,j) ==  (i>j ? i : j)
+  } 
+
+  axiom comptwounit {
+    forall a:Array :: {constcomptwo(a)} 
+    getunit(constcompone(a)) == 0
+  } 
+
+}
+
 // the sum of array according to a filter
-function sumRange(a: Array, f: Filter[Int]) : Int
-  requires forall j:Int :: filtering(f,j)  ==> acc(loc(a,j).val)
+// function sumRange(f: Filter[Int], r:Receiver[Int]) : Int
+//   requires forall j:Int :: filtering(f,j)  ==> acc(eval(r,j).val)
+//   // requires forall i:Int :: filtering(f,i) ==> i >= 0 && i <= len(a)
+
+function evalCompIntInt(c:Comp[Int,Int]) : Int
+  requires forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val)
   // requires forall i:Int :: filtering(f,i) ==> i >= 0 && i <= len(a)
+
+function evalCompIntSetInt(c:Comp[Int,Set[Int]]) : Set[Int]
+  requires forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val)  
 
 method incrementtwo(a: Array, i:Int) 
   requires access(a)
   requires 0 <= i && i < len(a)
   ensures  access(a)
-  //ensures sumRange(a,constfilterone(a)) == old(sumRange(a,constfilterone(a))) + 2   
+  ensures evalCompIntInt(constcompone(a)) == old(evalCompIntInt(constcompone(a))) + 2
 {
-    assert forall j:Int :: filtering(constfilterone(a),j)  ==> 0 <= j && j < len(a)
-    assert forall j:Int :: filtering(constfilterone(a),j)  ==> acc(loc(a,j).val)
+    // eventually: for any filter, any receiver
+    // only filter 
+    // assume sumRange(constfilterone(a),a) == sumRange(narrow(constfilterone(a),i),a) + loc(a,i).val
+    // filter + receiver : not using inverse 
+    //assume sumRange(constfilterone(a),constreceiverone(a)) == sumRange(narrow(constfilterone(a),i),constreceiverone(a)) + loc(a,i).val
+    // filter + receiver + inverse
+    //assume sumRange(constfilterone(a),constreceiverone(a)) == sumRange(narrow(constfilterone(a),inverseval(constreceiverone(a),loc(a,i))),constreceiverone(a)) + loc(a,i).val
     
-    //assume sumRange(a,constfilterone(a)) == sumRange(a,narrow(constfilterone(a),loc(a,i))) + loc(a,i).val 
-    loc(a,i).val := loc(a,i).val + 2
-    // assume sumRange(a,constfilterone(a)) == sumRange(a,narrow(constfilterone(a),loc(a,i))) + loc(a,i).val 
+    // assume sumRange(constcompone(a)) == 
+    // sumRange(comp(narrow(getfilter(constcompone(a)),inverseval(getreceiver(constcompone(a)),loc(a,i))),getreceiver(constcompone(a)))) 
+    // + loc(a,i).val
 
-    //assert forall j:Int :: filtering(constfilterone(a),j)  ==> acc(loc(a,j).val)
+    // assume filtering(getfilter(constcompone(a)),inverseval(getreceiver(constcompone(a)),eval(getreceiver(constcompone(a)),i))) && isvalfield(constcompone(a)) && (forall j:Int :: filtering(getfilter(constcompone(a)),j)  ==> acc(eval(getreceiver(constcompone(a)),j).val))  ==> 
+    // sumRange(constcompone(a)) == sumRange(comp(narrow(getfilter(constcompone(a)),inverseval(getreceiver(constcompone(a)),loc(a,i))),getreceiver(constcompone(a)))) + loc(a,i).val
+     //sumRange(comp(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,i))),getreceiver(c),getoperator(c))) + loc(a,i).val
+
+    assume forall c: Comp[Int,Int] :: {isvalfield(c)} 
+    filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),i))) && isvalfield(c) && (forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val))  ==> 
+    
+    evalCompIntInt(c) == 
+    oper(getoperator(constcompone(a)), 
+    evalCompIntInt(comp(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,i))),getreceiver(c),getoperator(c),getunit(c))), 
+    loc(a,i).val)
+   
+    loc(a,i).val := loc(a,i).val + 2
+
+    assume forall c: Comp[Int,Int] :: {isvalfield(c)} 
+    filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),i))) && isvalfield(c) && (forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val))  ==> 
+    evalCompIntInt(c) == 
+    oper(getoperator(constcompone(a)), 
+    evalCompIntInt(comp(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,i))),getreceiver(c),getoperator(c),getunit(c))), 
+    loc(a,i).val)
+
+    // assume sumRange(constcompone(a)) == 
+    // sumRange(comp(narrow(getfilter(constcompone(a)),inverseval(getreceiver(constcompone(a)),loc(a,i))),getreceiver(constcompone(a)))) 
+    // + loc(a,i).val
+    // assume forall c: Comp[Int] :: {getfilter(c),getreceiver(c)} 
+    // filtering(getfilter(c),inverseval(getreceiver(c),loc(a,i))) && isvalfield(c)==> 
+    // sumRange(c) == sumRange(comp(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,i))),getreceiver(c))) + loc(a,i).val
+}
+
+method incrementtwo_checkformaximum(a: Array, i:Int) 
+  requires access(a)
+  requires 0 <= i && i < len(a)
+  ensures  access(a)
+  ensures evalCompIntInt(constcomptwo(a)) == old(evalCompIntInt(constcomptwo(a))) + 2
+{
+    assume forall c: Comp[Int,Int] :: {isvalfield(c)} 
+    filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),i))) && isvalfield(c) && (forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val))  ==> 
+    
+    evalCompIntInt(c) == 
+    oper(getoperator(constcompone(a)), 
+    evalCompIntInt(comp(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,i))),getreceiver(c),getoperator(c),getunit(c))), 
+    loc(a,i).val)
+   
+    loc(a,i).val := loc(a,i).val + 2
+
+    assume forall c: Comp[Int,Int] :: {isvalfield(c)} 
+    filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),i))) && isvalfield(c) && (forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val))  ==> 
+    evalCompIntInt(c) == 
+    oper(getoperator(constcompone(a)), 
+    evalCompIntInt(comp(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,i))),getreceiver(c),getoperator(c),getunit(c))), 
+    loc(a,i).val)
 }
 
 
-
-// /* swap the value at postion m and postion n in array a
-//  */
-// method swap(a: Array, m:Int, n:Int) 
-//   requires access(a)
-//   requires 0 <= m && m < len(a) && 0 <= n && n < len(a) && m < n
-//   ensures  access(a)
-//   ensures  sumRange(a,0,len(a)) == old(sumRange(a,0,len(a)))
-// {
-//     assume sumRange(a,0,len(a)) == sumRange(a,0,m) + loc(a,m).val + sumRange(a,m+1,n) + loc(a,n).val + sumRange(a,n+1,len(a)) 
-//     var value : Int := loc(a,m).val
-//     loc(a,m).val := loc(a,n).val
-//     loc(a,n).val := value
-//     assume sumRange(a,0,len(a)) == sumRange(a,0,m) + loc(a,m).val + sumRange(a,m+1,n) + loc(a,n).val + sumRange(a,n+1,len(a)) 
-// }
-
-// // /* 
-// // reverse the array
-// //  */
-// method reverse(a: Array) 
-//   requires access(a)
-//   ensures  access(a)
-//   ensures  sumRange(a,0,len(a)) == old(sumRange(a,0,len(a)))
-// {
+/* swap the value at postion m and postion n in array a
+ */
+method swap(a: Array, m:Int, n:Int) 
+  requires access(a)
+  requires 0 <= m && m < len(a) && 0 <= n && n < len(a) && m < n
+  ensures  access(a)
+  ensures evalCompIntInt(constcompone(a)) == old(evalCompIntInt(constcompone(a))) 
+{
+    //assume sumRange(a,0,len(a)) == sumRange(a,0,m) + loc(a,m).val + sumRange(a,m+1,n) + loc(a,n).val + sumRange(a,n+1,len(a)) 
     
-//     var start: Int := 0
-//     var end: Int := len(a) - 1
+    // narrow m then narrow n
+    // assume sumRange(constfilterone(a),constreceiverone(a)) == 
+    // sumRange(narrow(narrow(constfilterone(a),inverseval(constreceiverone(a),loc(a,m))),inverseval(constreceiverone(a),loc(a,n))),constreceiverone(a)) 
+    // + loc(a,m).val + loc(a,n).val
 
-//     while (start < end)
-//       invariant access(a)
-//       invariant 0 <= start && end < len(a)
-//       invariant sumRange(a,0,len(a)) == old(sumRange(a,0,len(a)))
-//     {
-//       assume sumRange(a,0,len(a)) == sumRange(a,0,start) + loc(a,start).val + sumRange(a,start+1,end) + loc(a,end).val + sumRange(a,end+1,len(a)) 
-//       // label l
-//       var value : Int := loc(a,end).val
-//       loc(a,end).val := loc(a,start).val
-//       loc(a,start).val := value
-//       // assert loc(a,start).val == old[l](loc(a,end).val)
-//       assume sumRange(a,0,len(a)) == sumRange(a,0,start) + loc(a,start).val + sumRange(a,start+1,end) + loc(a,end).val + sumRange(a,end+1,len(a)) 
-//       start := start + 1
-//       end := end - 1
-//     }
-// }
+    assume forall c: Comp[Int,Int] :: {isvalfield(c)} 
+    filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),m))) && filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),n))) 
+    && isvalfield(c) && (forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val))  ==> 
+    // used oper and narrow twice might not be so general here.. 
+    evalCompIntInt(c) == 
+    oper(getoperator(constcompone(a)), oper(getoperator(constcompone(a)), 
+    evalCompIntInt(comp(narrow(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,m))),inverseval(getreceiver(c),loc(a,n))),getreceiver(c),getoperator(c),getunit(c))), 
+    loc(a,m).val), loc(a,n).val)
+    
+    var value : Int := loc(a,m).val
+    loc(a,m).val := loc(a,n).val
+    loc(a,n).val := value
+    
+    assume forall c: Comp[Int,Int] :: {isvalfield(c)} 
+    filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),m))) && filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),n))) 
+    && isvalfield(c) && (forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val))  ==> 
+    evalCompIntInt(c) == 
+    oper(getoperator(constcompone(a)), oper(getoperator(constcompone(a)), 
+    evalCompIntInt(comp(narrow(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,m))),inverseval(getreceiver(c),loc(a,n))),getreceiver(c),getoperator(c),getunit(c))), 
+    loc(a,m).val), loc(a,n).val)
+}
 
+// /* 
+// reverse the array
+//  */
+method reverse(a: Array) 
+  requires access(a)
+  ensures  access(a)
+  ensures evalCompIntInt(constcompone(a)) == old(evalCompIntInt(constcompone(a))) 
+{
+    
+    var start: Int := 0
+    var end: Int := len(a) - 1
 
-// method client() {
-//   var a: Array
-//   // [0,1,2,3,4]
-//   inhale len(a) == 5
-//   inhale access(a)
-//   inhale forall i: Int :: 0 <= i && i < len(a) ==> loc(a, i).val == i
-//   // var sum1 : Int := sum(a)
-//   // //assert(sum(a) + 2 == sum(incrementtwo(a,2)))
-//   // incrementtwo(a,2) // [0,1,4,3,4]
-//   // var sum2 : Int := sum(a)
-//   // // assert(sum1 != sum2)
-//   // assert(incremented(a))
-  
-// }
+    while (start < end)
+      invariant access(a)
+      invariant 0 <= start && end < len(a)
+      invariant evalCompIntInt(constcompone(a)) == old(evalCompIntInt(constcompone(a))) 
+    {
+      //assume sumRange(a,0,len(a)) == sumRange(a,0,start) + loc(a,start).val + sumRange(a,start+1,end) + loc(a,end).val + sumRange(a,end+1,len(a)) 
+      assume forall c: Comp[Int,Int] :: {isvalfield(c)} 
+    filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),start))) && filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),end))) 
+    && isvalfield(c) && (forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val))  ==> 
+    
+    evalCompIntInt(c) == 
+    oper(getoperator(constcompone(a)), oper(getoperator(constcompone(a)), 
+    evalCompIntInt(comp(narrow(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,start))),inverseval(getreceiver(c),loc(a,end))),getreceiver(c),getoperator(c),getunit(c))), 
+    loc(a,start).val), loc(a,end).val)
+
+      // label l
+      var value : Int := loc(a,end).val
+      loc(a,end).val := loc(a,start).val
+      loc(a,start).val := value
+      // assert loc(a,start).val == old[l](loc(a,end).val)
+       assume forall c: Comp[Int,Int] :: {isvalfield(c)} 
+       filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),start))) && filtering(getfilter(c),inverseval(getreceiver(c),eval(getreceiver(c),end))) 
+       && isvalfield(c) && (forall j:Int :: filtering(getfilter(c),j)  ==> acc(eval(getreceiver(c),j).val))  ==> 
+       
+       evalCompIntInt(c) == oper(getoperator(constcompone(a)), oper(getoperator(constcompone(a)), 
+       evalCompIntInt(comp(narrow(narrow(getfilter(c),inverseval(getreceiver(c),loc(a,start))),inverseval(getreceiver(c),loc(a,end))),getreceiver(c),getoperator(c),getunit(c))), 
+       loc(a,start).val), loc(a,end).val)
+
+      start := start + 1
+      end := end - 1
+    }
+}
